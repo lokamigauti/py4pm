@@ -66,7 +66,7 @@ class ReaderAccessor():
         pmf.species = pmf.dfprofiles_b.index.tolist()
         pmf.nspecies = len(pmf.species)
 
-        TOTALVAR = ["PM10", "PM2.5", "PMrecons", "PM10rec", "PM10recons"]
+        TOTALVAR = ["PM10", "PM2.5", "PMrecons", "PM10rec", "PM10recons", 'Concentration']
         for x in TOTALVAR:
             if x in pmf.species:
                 pmf.totalVar = x
