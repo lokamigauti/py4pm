@@ -223,7 +223,8 @@ class ReaderAccessor():
         dfcontrib.dropna(axis=1, how="all", inplace=True)
         dfcontrib.dropna(how="all", inplace=True)
         dfcontrib.drop(columns=dfcontrib.columns[0], inplace=True)
-        dfcontrib.columns = ["Date"] + pmf.profiles
+        dfcontrib.columns = ['ID', "Date"] + pmf.profiles
+        dfcontrib.drop(columns='ID', inplace=True)
         dfcontrib.set_index("Date", inplace=True)
         dfcontrib = dfcontrib[dfcontrib.index.notnull()]
 
