@@ -265,7 +265,8 @@ class ReaderAccessor():
             dfcontrib = dfcontrib.loc[:, :nancolumns.idxmax()]
         dfcontrib.dropna(axis=0, how="all", inplace=True)
         dfcontrib.dropna(axis=1, how="all", inplace=True)
-        dfcontrib.columns = ["Date"] + pmf.profiles
+        dfcontrib.columns = ['ID', "Date"] + pmf.profiles
+        dfcontrib.drop(columns='ID', inplace=True)
         dfcontrib.replace({-999: np.nan}, inplace=True)
         dfcontrib.set_index("Date", inplace=True)
         dfcontrib = dfcontrib[dfcontrib.index.notnull()]
