@@ -8,7 +8,7 @@ import seaborn as sns
 from py4pm.chemutilities import get_sourceColor, get_sourcesCategories, format_ions
 
 
-XLSX_ENGINE = "xlrd"
+XLSX_ENGINE = "openpyxl"
 
 class CachedAccessor:
      """
