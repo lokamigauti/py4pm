@@ -26,7 +26,7 @@ class LegendTitle(object):
         handlebox.add_artist(title)
         return title
 
-def to_relativeMass(df, totalVar="PM10"):
+def to_relativeMass(df, totalVar="Concentration"):
     """Normalize the profile df to the relative mass with regard to the totalVar
     (=PM10 or PM2.5).
 
@@ -52,7 +52,7 @@ def to_relativeMass(df, totalVar="PM10"):
     dftmp = df.copy()
     if isinstance(dftmp, pd.DataFrame):
         dftmp.dropna(axis=1, how="all", inplace=True)
-    dftmp /= dftmp.loc[totalVar]
+    dftmp = dftmp.div(dftmp.loc[totalVar])
     dftmp.drop(totalVar, inplace=True)
     return dftmp
 
@@ -172,14 +172,14 @@ def compute_PD(df1, df2, factor1=None, factor2=None, isRelativeMass=True):
             isRelativeMass=isRelativeMass
             )
 
-    # Remove this part (impact performance)
-    # p1.dropna(inplace=True)
-    # p2.dropna(inplace=True)
+    p1.dropna(inplace=True)
+    p2.dropna(inplace=True)
 
     # Compute the Pearson Distance
     sp = p1.index.intersection(p2.index)
+
     if len(sp) > 3:
-        PD = 1 - np.corrcoef(p1[sp], p2[sp])[1, 0]**2
+        PD = 1 - np.corrcoef(p1[sp], p2[sp])[1, 0]
     else:
         PD = np.nan
 
@@ -311,7 +311,6 @@ def get_all_SID_PD(df_profiles, stations, compare_to=None, isRelativeMass=False)
             factor2 = factor1
         else:
             factor2 = compare_to
-        print(factor1)
         for station1 in stations:
             list_stations1.append(station1)
             if all(df_profiles.loc[station1, factor1].isnull()):
@@ -472,7 +471,7 @@ def plot_all_stations_similarity_by_source(df_profile):
         if df_profile.loc[:, factor].isnull().all():
             continue
         f, ax = plt.subplots()
-        color = sourcesColor(factor)
+        color = get_sourceColor(factor)
         for station1, station2 in itertools.product(stations, stations):
             if station1 == station2:
                 continue
@@ -637,7 +636,42 @@ def plot_relativeMass(PMF_profile, source="Biomass burning",
         wspace=0.2
     )
 
-def save4deltaTool(contrib, profile):
+def save4deltaTool(contrib, profile, total_var='Concentration', single_station=False, filepath=None):
+    if single_station:
+        F = profile.dropna(how='all', axis=1) \
+            .rename({"OC*": "OC", "SO42-": "SO4=", total_var:'TOTAL MASS'})
+        G = contrib.dropna(how='all', axis=1)
+        dfcontrib = G * F.loc['TOTAL MASS']
+        dfcontrib2specie = ((F.T / F.sum(axis=1)).T * 100).copy()
+
+        fname = "pmf_4deltaTool.csv"
+        if filepath is not None:
+            fname = filepath + fname
+        F.index.name = "CON (µg/m3)"
+        dfcontrib.index.name = "TREND (µg/m3)"
+        dfcontrib2specie.index.name = "CONTR"
+
+        F.to_csv("CONC.csv")
+        dfcontrib.to_csv("TREND.csv", date_format='%m/%d/%Y')
+        dfcontrib2specie.to_csv("CONTR.csv")
+        with open(fname, "w") as f:
+            f.write("MATRIX 1\n")
+            f.write(F.to_csv())
+            f.write("\nMATRIX 3\n")
+            f.write(dfcontrib.to_csv(date_format='%m/%d/%Y'))
+            f.write("\nMATRIX 4\n")
+            f.write(dfcontrib2specie.to_csv())
+        list_files = ["CONC.csv", "TREND.csv", "CONTR.csv"]
+        zipname = "pmf4delta.zip"
+        if filepath is not None:
+            zipname = filepath + zipname
+        with ZipFile(zipname, "w") as zip:
+            for file in list_files:
+                zip.write(file)
+        for file in list_files:
+            os.remove(file)
+        return True
+
     stations = profile.index.get_level_values('station').unique()
     for station in stations:
         F = profile.loc[station,:].dropna(how='all', axis=1)\

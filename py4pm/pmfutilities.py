@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 import matplotlib.colors as mcolors
 import seaborn as sns
-from py4pm.chemutilities import get_sourceColor, get_sourcesCategories, format_ions
+from py4pm.chemutilities import get_sourceColor, get_sourcesCategories, pretty_specie
 
 
 XLSX_ENGINE = "openpyxl"
@@ -223,8 +223,14 @@ class ReaderAccessor():
         dfcontrib.dropna(axis=1, how="all", inplace=True)
         dfcontrib.dropna(how="all", inplace=True)
         dfcontrib.drop(columns=dfcontrib.columns[0], inplace=True)
-        dfcontrib.columns = ['ID', "Date"] + pmf.profiles
-        dfcontrib.drop(columns='ID', inplace=True)
+        print(dfcontrib)
+        print(pmf.profiles)
+        if len(dfcontrib.columns) == len(pmf.profiles) + 1:
+            dfcontrib.columns = ["Date"] + pmf.profiles
+        if len(dfcontrib.columns) == len(pmf.profiles) + 2:
+            dfcontrib.columns = ['ID', "Date"] + pmf.profiles
+            dfcontrib.drop(columns='ID', inplace=True)
+        dfcontrib['Date'] = pd.to_datetime(dfcontrib['Date'])
         dfcontrib.set_index("Date", inplace=True)
         dfcontrib = dfcontrib[dfcontrib.index.notnull()]
 
@@ -265,9 +271,13 @@ class ReaderAccessor():
             dfcontrib = dfcontrib.loc[:, :nancolumns.idxmax()]
         dfcontrib.dropna(axis=0, how="all", inplace=True)
         dfcontrib.dropna(axis=1, how="all", inplace=True)
-        dfcontrib.columns = ['ID', "Date"] + pmf.profiles
-        dfcontrib.drop(columns='ID', inplace=True)
+        if len(dfcontrib.columns) == len(pmf.profiles) + 1:
+            dfcontrib.columns = ["Date"] + pmf.profiles
+        if len(dfcontrib.columns) == len(pmf.profiles) + 2:
+            dfcontrib.columns = ['ID', "Date"] + pmf.profiles
+            dfcontrib.drop(columns='ID', inplace=True)
         dfcontrib.replace({-999: np.nan}, inplace=True)
+        dfcontrib['Date'] = pd.to_datetime(dfcontrib['Date'])
         dfcontrib.set_index("Date", inplace=True)
         dfcontrib = dfcontrib[dfcontrib.index.notnull()]
 
@@ -411,7 +421,7 @@ class ReaderAccessor():
 
 
         # ==== DISP swap
-        idx = rawdf.iloc[:, 1].str.contains("Swaps").fillna(False)
+        idx = rawdf.iloc[:, 1].str.contains("Swaps by").fillna(False)
         if idx.sum() > 0:
             df = pd.DataFrame()
             df = rawdf.loc[idx, :]\
@@ -419,6 +429,8 @@ class ReaderAccessor():
                     .iloc[:, 1:]\
                     .reset_index(drop=True)
             df.columns = pmf.profiles
+            if len(df.index) > 1: # DISP+BS calculated, if equals 1 DISP+BS not calculated
+                df = df.drop(0, axis=0)
             df.index = ["swap count"]
 
             pmf.df_disp_swap_b = df
@@ -432,9 +444,10 @@ class ReaderAccessor():
                 .index
         df = pd.DataFrame()
         df = rawdf.loc[idx[0]+1:idx[-1]+1+pmf.nspecies, :]
-        idx = df.iloc[:, 0].str.contains("Specie|Concentration").astype(bool)
+        idx = df.iloc[:, 0].str.contains("Specie|Concentrations").astype(bool)
         df = df.drop(idx[idx].index)
         df = df.dropna(axis=0, how='all')
+
         df["profile"] = pd.np.repeat(pmf.profiles, len(pmf.species)).tolist()
 
         df.columns = ["specie", "Base run", 
@@ -472,7 +485,7 @@ class ReaderAccessor():
         rawdf = rawdf.dropna(axis=0, how="all").reset_index().drop("index", axis=1)
 
         # ==== DISP swap
-        idx = rawdf.iloc[:, 1].str.contains("Swaps").fillna(False)
+        idx = rawdf.iloc[:, 1].str.contains("Swaps by").fillna(False)
         if idx.sum() > 0:
             df = pd.DataFrame()
             df = rawdf.loc[idx, :]\
@@ -480,6 +493,8 @@ class ReaderAccessor():
                     .iloc[:, 1:]\
                     .reset_index(drop=True)
             df.columns = pmf.profiles
+            if len(df.index) > 1:  # DISP+BS calculated, if equals 1 DISP+BS not calculated
+                df = df.drop(0, axis=0)
             df.index = ["swap count"]
 
             pmf.df_disp_swap_c = df
@@ -493,7 +508,7 @@ class ReaderAccessor():
                 .index
         df = pd.DataFrame()
         df = rawdf.loc[idx[0]+1:idx[-1]+1+pmf.nspecies, :]
-        idx = df.iloc[:, 0].str.contains("Specie|Concentration").astype(bool)
+        idx = df.iloc[:, 0].str.contains("Specie|Concentrations").astype(bool)
         df = df.drop(idx[idx].index)
         df = df.dropna(axis=0, how='all')
         df["profile"] = np.repeat(pmf.profiles, len(pmf.species)).tolist()
@@ -580,7 +595,7 @@ class PlotterAccessor():
                       ax=ax, jitter=False, color="red")
         ax.set_yscale('log')
         ax.set_xticklabels(
-            format_ions([t.get_text() for t in ax.get_xticklabels()]),
+            pretty_specie([t.get_text() for t in ax.get_xticklabels()]),
             rotation=90
         )
         ax.set_ylim((10e-6, 3))
@@ -634,12 +649,12 @@ class PlotterAccessor():
         d = d.reindex(species).unstack().reset_index()
         dref = dfprofiles[profile].divide(dfprofiles.sum(axis=1)) * 100
         dref = dref.reset_index()
-        sns.barplot(data=d, x="specie", y=0, color="grey", ci="sd", ax=ax,
+        sns.barplot(data=d, x="specie", y=0, color="grey", errorbar="sd", ax=ax,
                     label="BS (sd)")
         sns.stripplot(data=dref, x="specie", y=0, color="red", jitter=False,
                       ax=ax, label="Ref. run")
         ax.set_xticklabels(
-            format_ions([t.get_text() for t in ax.get_xticklabels()]),
+            pretty_specie([t.get_text() for t in ax.get_xticklabels()]),
             rotation=90
         )
         ax.set_ylim((0, 100))
@@ -973,6 +988,7 @@ class PlotterAccessor():
         for p in profiles:
             self._plot_totalspeciesum(df=df, profile=p, species=species,
                                       sumsp=sumsp, new_figure=new_figure,
+                                      constrained=constrained,
                                       **kwargs)
             plt.subplots_adjust(left=0.1, right=0.9, bottom=0.3, top=0.9)
             if plot_save:
@@ -1311,7 +1327,7 @@ class PlotterAccessor():
         df.plot(kind="bar", stacked=True, color=colors, ax=ax)
 
         xticklabels = [t.get_text() for t in ax.get_xticklabels()]
-        ax.set_xticklabels(format_ions(xticklabels), rotation=90)
+        ax.set_xticklabels(pretty_specie(xticklabels), rotation=90)
         ax.set_xlabel("")
 
         ax.yaxis.set_major_formatter(mticker.PercentFormatter())
@@ -1664,20 +1680,25 @@ class PMF(object):
         mapper : dict
             Key of the dictionnary are the old name, and value the desired name
         """
-        DF = [
-            self.dfprofiles_b,
-            self.dfprofiles_c,
-            self.dfcontrib_b,
-            self.dfcontrib_c,
+        DF_0 = [
             self.dfBS_profile_b,
             self.dfBS_profile_c,
             self.df_uncertainties_summary_b,
             self.df_uncertainties_summary_c,
         ]
-        for df in DF:
+        DF_1 = [
+            self.dfprofiles_b,
+            self.dfprofiles_c,
+            self.dfcontrib_b,
+            self.dfcontrib_c,
+        ]
+        for df in DF_1:
             if df is None:
                 continue
             df.rename(mapper, inplace=True, axis=1)
+        for df in DF_0:
+            if df is None:
+                continue
             df.rename(mapper, inplace=True, axis=0)
 
         new_profiles = []
